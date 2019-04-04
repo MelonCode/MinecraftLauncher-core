@@ -10,10 +10,9 @@ function downloadAsync (url, directory, name) {
     return new Promise(resolve => {
         shelljs.mkdir('-p', directory);
 
-        const _request = request(url);
+        const _request = request(url, { timeout: 3000 });
 
         _request.on('error', function(error) {
-            console.log(error.message);
             resolve({
                 failed: true,
                 asset: {
@@ -78,44 +77,55 @@ module.exports.getJar = function (version, number, directory) {
 };
 
 module.exports.getAssets = function (directory, version) {
-    return new Promise(async(resolve) => {
+    return new Promise(async (resolve) => {
         const assetsUrl = 'https://resources.download.minecraft.net';
-        const failed = [];
 
-        if(!fs.existsSync(path.join(directory, 'assets', 'indexes', `${version.assetIndex.id}.json`))) {
+        if (!fs.existsSync(path.join(directory, 'assets', 'indexes', `${version.assetIndex.id}.json`))) {
             await downloadAsync(version.assetIndex.url, path.join(directory, 'assets', 'indexes'), `${version.assetIndex.id}.json`);
         }
 
-        const index = require(path.join(directory, 'assets', 'indexes',`${version.assetIndex.id}.json`));
+        const index = require(path.join(directory, 'assets', 'indexes', `${version.assetIndex.id}.json`));
 
-        for(const asset in index.objects) {
-            const hash = index.objects[asset].hash;
-            const subhash = hash.substring(0,2);
-            const assetDirectory = path.join(directory, 'assets', 'objects', subhash);
-
-            if(!fs.existsSync(path.join(assetDirectory, hash))) {
-                const download = await downloadAsync(`${assetsUrl}/${subhash}/${hash}`, assetDirectory, hash);
-
-                if(download.failed) failed.push(download.asset);
+        let counter = 0;
+        let fails;
+        do {
+            console.log("Downloading assets, attempt #", ++counter);
+            fails = 0;
+            await Promise.all(Object.entries(index.objects)
+                .map(([name, asset]) => {
+                    const { hash } = asset;
+                    const subhash = hash.substring(0, 2);
+                    const assetDirectory = path.join(directory, 'assets', 'objects', subhash);
+                    if (!fs.existsSync(path.join(assetDirectory, hash)) || fs.statSync(path.join(assetDirectory, hash))["size"] !== asset.size) {
+                        return downloadAsync(`${assetsUrl}/${subhash}/${hash}`, assetDirectory, hash)
+                            .then((download) => {
+                                if (download.failed) {
+                                    console.log('Failed to download', name);
+                                    fails++;
+                                }
+                            })
+                    }
+                }))
+            if (counter++ > 20) {
+                console.log("Too much fails while downloading");
+                break;
             }
-        }
+            console.log({ counter, fails })
 
-        // why do we have this? B/c sometimes minecraft's resource site times out!
-        if(failed) {
-            for (const fail of failed) await downloadAsync(fail.url, fail.directory, fail.name);
-        }
+        } while (fails > 0)
+        console.log("Finished downloading")
 
         // Seems taking it out of the initial download loop allows everything to be copied...
-        if(version.assets === "legacy" || version.assets === "pre-1.6") {
-            for(const asset in index.objects) {
+        if (version.assets === "legacy" || version.assets === "pre-1.6") {
+            for (const asset in index.objects) {
                 const hash = index.objects[asset].hash;
-                const subhash = hash.substring(0,2);
+                const subhash = hash.substring(0, 2);
                 const assetDirectory = path.join(directory, 'assets', 'objects', subhash);
 
                 let legacyAsset = asset.split('/');
                 legacyAsset.pop();
 
-                if(!fs.existsSync(path.join(directory, 'assets', 'legacy', legacyAsset.join('/')))) {
+                if (!fs.existsSync(path.join(directory, 'assets', 'legacy', legacyAsset.join('/')))) {
                     shelljs.mkdir('-p', path.join(directory, 'assets', 'legacy', legacyAsset.join('/')));
                 }
 
