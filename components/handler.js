@@ -98,7 +98,7 @@ module.exports.getVersion = function(version, directory) {
   });
 };
 
-module.exports.getJar = function(version, number, directory) { 
+module.exports.getJar = function(version, number, directory) {
   return new Promise(async resolve => {
     await downloadAsync(
       version.downloads.client.url,
@@ -136,6 +136,7 @@ const assetsUrl = 'https://resources.download.minecraft.net';
 
 function checksumFile(path) {
   return new Promise((resolve, reject) => {
+    if (!fs.existsSync(filePath)) return reject('File not found');
     let hash = crypto.createHash('sha1');
     let stream = fs.createReadStream(path);
     stream.on('error', err => reject(err));
@@ -162,7 +163,7 @@ async function downloadAssets(directory, assets) {
       const assetDirectory = path.join(directory, 'assets', 'objects', subhash);
       const url = `${assetsUrl}/${subhash}/${hash}`;
       const filePath = path.resolve(assetDirectory, hash);
-      if (!(fs.existsSync(filePath) && fs.statSync(filePath)['size'] > 0)) {
+      if (!fs.existsSync(filePath) || fs.statSync(filePath)['size'] === 0) {
         const result = await downloadAsync(url, assetDirectory, hash);
         const { success } = result;
         if (success) {
@@ -180,20 +181,31 @@ async function downloadAssets(directory, assets) {
         }
       }
 
-      const fileHash = await checksumFile(path.join(assetDirectory, hash));
-      if (fileHash === hash) {
-        dCount += 1;
-        dSize += size;
-        event.emit("assets-download-status", {
-          dCount, totalCount, name
-        })
-        console.log(
-          `Checking file ${name}. Required hash ${hash} is equal to file hash ${fileHash}`
-        );
-      } else {
+      try {
+        const fileHash = await checksumFile(path.join(assetDirectory, hash));
+        if (fileHash === hash) {
+          dCount += 1;
+          dSize += size;
+          event.emit('assets-download-status', {
+            dCount,
+            totalCount,
+            name
+          });
+          console.log(
+            `Checking file ${name}. Required hash ${hash} is equal to file hash ${fileHash}`
+          );
+        } else {
+          failedAssets[name] = { hash, size };
+          console.warn(
+            `Failed to download ${name} as ${assetDirectory}/${hash}; Hashsum is different from expected`
+          );
+          shelljs.rm(path.resolve(assetDirectory, hash));
+        }
+      } catch (error) {
         failedAssets[name] = { hash, size };
-        console.warn(
-          `Failed to download ${name} as ${assetDirectory}//${hash}; Hashsum is different from expected`
+        console.error(
+          `Failed to validate checksum of ${name} in ${assetDirectory}/${hash}`,
+          error
         );
         shelljs.rm(path.resolve(assetDirectory, hash));
       }
@@ -205,13 +217,12 @@ async function downloadAssets(directory, assets) {
   return failedAssets;
 }
 
-module.exports.getAssets = function(directory, version) { 
-
+module.exports.getAssets = function(directory, version) {
   return new Promise(async resolve => {
     dCount = 0;
     dSize = 0;
-      
-    event.emit("assets-download-start");
+
+    event.emit('assets-download-start');
 
     if (
       !fs.existsSync(
