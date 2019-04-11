@@ -63,7 +63,7 @@ const downloadAsset = (url, directory, name) => {
 
     file.once('finish', async () => {
       file.close();
-      const checksum = await checksumFile(filePath)
+      const checksum = await checksumFile(filePath);
       resolve({ success: checksum === name, file, url, directory, name });
     });
   });
@@ -231,6 +231,7 @@ async function downloadAssets(directory, assets) {
 }
 
 module.exports.getAssets = function(directory, version) {
+  console.log('Getting assets', directory);
   return new Promise(async resolve => {
     dCount = 0;
     dSize = 0;
@@ -287,7 +288,7 @@ module.exports.getNatives = function(root, version, os) {
       nativeDirectory = path.join(root, 'natives', version.id);
     } else {
       nativeDirectory = path.join(root, 'natives', version.id);
-
+      console.log("shelljs.mkdir('-p', nativeDirectory)", nativeDirectory);
       shelljs.mkdir('-p', nativeDirectory);
 
       const download = version.libraries.map(async function(lib) {
@@ -296,7 +297,7 @@ module.exports.getNatives = function(root, version, os) {
         const native = lib.downloads.classifiers[type];
 
         if (native) {
-          const name = native.path.split('/').pop();
+          const name = native.path.split(path.sep).pop();
           await downloadAsync(native.url, nativeDirectory, name);
           try {
             new zip(path.join(nativeDirectory, name)).extractAllTo(
@@ -375,7 +376,9 @@ module.exports.getForgeDependencies = async function(
       paths.push(`${jarPath}\\${name}`);
       return;
     }
-    if (!fs.existsSync(jarPath)) shelljs.mkdir('-p', jarPath);
+    if (!fs.existsSync(jarPath)) {
+      shelljs.mkdir('-p', jarPath);
+    }
 
     await downloadAsync(downloadLink, jarPath, name);
 
@@ -399,9 +402,9 @@ module.exports.getClasses = function(root, version) {
       const libraryDirectory = path.join(root, 'libraries', libraryPath);
 
       if (!fs.existsSync(libraryDirectory)) {
-        let directory = libraryDirectory.split('\\');
+        let directory = libraryDirectory.split(path.sep);
         const name = directory.pop();
-        directory = directory.join('\\');
+        directory = directory.join(path.sep);
 
         await downloadAsync(libraryUrl, directory, name);
       }
