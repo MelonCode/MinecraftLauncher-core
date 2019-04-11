@@ -60,16 +60,16 @@ module.exports = async function (options) {
     }
 
     // Launch options. Thank you Lyrus for the reformat <3
-    const launchOptions = await handler.getLaunchOptions(versionFile, forge ? forge.forge : null, options);
+    // const launchOptions = await handler.getLaunchOptions(versionFile, forge ? forge.forge : null, options);
 
-    await new Promise((resolve, reject) => {
-        const launchArguments = args.concat(jvm, classPaths, launchOptions);
-        const minecraft = child.spawn(options.javaPath ? options.javaPath : 'java', launchArguments, { detached: true });
-        event.emit('start', null);
-        minecraft.stdout.on('data', (data) => event.emit('data', data));
-        minecraft.stderr.on('data', (data) => event.emit('error', data));
-        setTimeout(() => resolve(minecraft), 1000);
-    })
+    // await new Promise((resolve, reject) => {
+    //     const launchArguments = args.concat(jvm, classPaths, launchOptions);
+    //     const minecraft = child.spawn(options.javaPath ? options.javaPath : 'java', launchArguments, { detached: true });
+    //     event.emit('start', null);
+    //     minecraft.stdout.on('data', (data) => event.emit('data', data));
+    //     minecraft.stderr.on('data', (data) => event.emit('error', data));
+    //     setTimeout(() => resolve(minecraft), 1000);
+    // })
 
     // minecraft.on('close', (code) => event.emit('close', code));
 };
