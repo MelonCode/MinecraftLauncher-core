@@ -115,23 +115,6 @@ module.exports.getJar = function(version, number, directory) {
   });
 };
 
-function chunk(list, chunkSize = 10) {
-  if (!list.length) {
-    return [];
-  }
-
-  let i,
-    j,
-    t,
-    chunks = [];
-  for (i = 0, j = list.length; i < j; i += chunkSize) {
-    t = list.slice(i, i + chunkSize);
-    chunks.push(t);
-  }
-
-  return chunks;
-}
-
 const assetsUrl = 'https://resources.download.minecraft.net';
 
 function checksumFile(path) {
@@ -186,42 +169,10 @@ async function downloadAssets(directory, assets) {
           );
         } else {
           failedAssets[name] = { hash, size };
-          // console
-          //   .warn
-          //   `Failed to download ${name} from ${url} as ${assetDirectory}//${hash}`
-          //   ();
+          // console.warn(`Failed to download ${name} from ${url} as ${assetDirectory}//${hash}`);
           return;
         }
       }
-
-      // try {
-      //   const fileHash = await checksumFile(filePath);
-      //   if (fileHash === hash) {
-      //     dCount += 1;
-      //     dSize += size;
-      //     event.emit('assets-download-status', {
-      //       dCount,
-      //       totalCount,
-      //       name
-      //     });
-      //     // console.log(
-      //     //   `Checking file ${name}. Required hash ${hash} is equal to file hash ${fileHash}`
-      //     // );
-      //   } else {
-      //     failedAssets[name] = { hash, size };
-      //     console.warn(
-      //       `Failed to download ${name} as ${assetDirectory}/${hash}; Hashsum is different from expected`
-      //     );
-      //     shelljs.rm(filePath);
-      //   }
-      // } catch (error) {
-      //   failedAssets[name] = { hash, size };
-      //   console.error(
-      //     `Failed to validate checksum of ${name} in ${assetDirectory}/${hash}`,
-      //     error
-      //   );
-      //   shelljs.rm(filePath);
-      // }
     })
   ).catch(error => {
     console.error('Unpredictable error!', error);
@@ -281,6 +232,7 @@ module.exports.getAssets = function(directory, version) {
 };
 
 module.exports.getNatives = function(root, version, os) {
+  console.log('Getting natives', root);
   return new Promise(async resolve => {
     let nativeDirectory;
 
@@ -288,7 +240,6 @@ module.exports.getNatives = function(root, version, os) {
       nativeDirectory = path.join(root, 'natives', version.id);
     } else {
       nativeDirectory = path.join(root, 'natives', version.id);
-      console.log("shelljs.mkdir('-p', nativeDirectory)", nativeDirectory);
       shelljs.mkdir('-p', nativeDirectory);
 
       const download = version.libraries.map(async function(lib) {
@@ -297,7 +248,7 @@ module.exports.getNatives = function(root, version, os) {
         const native = lib.downloads.classifiers[type];
 
         if (native) {
-          const name = native.path.split(path.sep).pop();
+          const name = native.path.split('/').pop();
           await downloadAsync(native.url, nativeDirectory, name);
           try {
             new zip(path.join(nativeDirectory, name)).extractAllTo(
@@ -391,6 +342,7 @@ module.exports.getForgeDependencies = async function(
 };
 
 module.exports.getClasses = function(root, version) {
+  console.log('Getting classes', root);
   return new Promise(async resolve => {
     const libs = [];
 
